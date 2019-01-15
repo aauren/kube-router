@@ -106,6 +106,7 @@ type NetworkRoutingController struct {
 	pathPrepend             bool
 	localAddressList        []string
 	overrideNextHop         bool
+	disableHostRouteInject  bool
 
 	nodeLister cache.Indexer
 	svcLister  cache.Indexer
@@ -347,6 +348,9 @@ func (nrc *NetworkRoutingController) watchBgpUpdates() {
 				}
 				for _, path := range msg.PathList {
 					if path.IsLocal() {
+						continue
+					}
+					if nrc.disableHostRouteInject {
 						continue
 					}
 					if err := nrc.injectRoute(path); err != nil {
@@ -929,6 +933,13 @@ func NewNetworkRoutingController(clientset kubernetes.Interface,
 	nrc.advertiseLoadBalancerIP = kubeRouterConfig.AdvertiseLoadBalancerIp
 	nrc.advertisePodCidr = kubeRouterConfig.AdvertiseNodePodCidr
 	nrc.enableOverlays = kubeRouterConfig.EnableOverlay
+	nrc.disableHostRouteInject = kubeRouterConfig.DisableHostRouteInject
+	// Overlays require that local routes be injected in order to function properly. If the user has selected to enable overlays
+	// allow that to override host route injection preferences with a warning.
+	if kubeRouterConfig.DisableHostRouteInject && nrc.enableOverlays {
+		glog.Warningf("--disable-host-route-inject cannot be enabled while --enable-overlays is enabled, ignoring --disable-host-route-inject option")
+		nrc.disableHostRouteInject = false
+	}
 
 	nrc.bgpPort = kubeRouterConfig.BGPPort
 

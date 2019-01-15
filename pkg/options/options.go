@@ -22,6 +22,7 @@ type KubeRouterConfig struct {
 	ClusterAsn              uint
 	ClusterCIDR             string
 	DisableSrcDstCheck      bool
+	DisableHostRouteInject  bool
 	EnableCNI               bool
 	EnableiBGP              bool
 	EnableOverlay           bool
@@ -149,4 +150,7 @@ func (s *KubeRouterConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.OverrideNextHop, "override-nexthop", false, "Override the next-hop in bgp routes sent to peers with the local ip.")
 	fs.BoolVar(&s.DisableSrcDstCheck, "disable-source-dest-check", true,
 		"Disable the source-dest-check attribute for AWS EC2 instances. When this option is false, it must be set some other way.")
+	fs.BoolVar(&s.DisableHostRouteInject, "disable-host-route-inject", false,
+		"Disable local host route injections when BGP best next hops are within the same subnet. This cannot be set to true when "+
+		"--enable-overlay is true.")
 }
