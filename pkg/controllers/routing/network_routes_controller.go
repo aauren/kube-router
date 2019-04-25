@@ -436,6 +436,11 @@ func (nrc *NetworkRoutingController) injectRoute(path *table.Path) error {
 				glog.Errorf("Failed to delete tunnel link for the node due to " + err.Error())
 			}
 		}
+
+		// if the user has disabled overlays, stop here as the rest of this function doesn't apply
+		if !nrc.enableOverlays {
+			return nil
+		}
 	}
 
 	// create IPIP tunnels only when node is not in same subnet or overlay-type is set to 'full'
