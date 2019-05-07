@@ -446,40 +446,42 @@ func (nrc *NetworkRoutingController) injectRoute(path *table.Path) error {
 		var link netlink.Link
 		var err error
 		link, err = netlink.LinkByName(tunnelName)
-		if err != nil {
-			out, err := exec.Command("ip", "tunnel", "add", tunnelName, "mode", "ipip", "local", nrc.nodeIP.String(),
-				"remote", nexthop.String(), "dev", nrc.nodeInterface).CombinedOutput()
+		if !path.IsWithdraw {
 			if err != nil {
-				return fmt.Errorf("Route not injected for the route advertised by the node %s "+
-					"Failed to create tunnel interface %s. error: %s, output: %s",
-					nexthop.String(), tunnelName, err, string(out))
+				out, err := exec.Command("ip", "tunnel", "add", tunnelName, "mode", "ipip", "local", nrc.nodeIP.String(),
+					"remote", nexthop.String(), "dev", nrc.nodeInterface).CombinedOutput()
+				if err != nil {
+					return fmt.Errorf("Route not injected for the route advertised by the node %s "+
+						"Failed to create tunnel interface %s. error: %s, output: %s",
+						nexthop.String(), tunnelName, err, string(out))
+				}
+
+				link, err = netlink.LinkByName(tunnelName)
+				if err != nil {
+					return fmt.Errorf("Route not injected for the route advertised by the node %s "+
+						"Failed to get tunnel interface by name error: %s", tunnelName, err)
+				}
+				if err := netlink.LinkSetUp(link); err != nil {
+					return errors.New("Failed to bring tunnel interface " + tunnelName + " up due to: " + err.Error())
+				}
+				// reduce the MTU by 20 bytes to accommodate ipip tunnel overhead
+				if err := netlink.LinkSetMTU(link, link.Attrs().MTU-20); err != nil {
+					return errors.New("Failed to set MTU of tunnel interface " + tunnelName + " up due to: " + err.Error())
+				}
+			} else {
+				glog.Infof("Tunnel interface: " + tunnelName + " for the node " + nexthop.String() + " already exists.")
 			}
 
-			link, err = netlink.LinkByName(tunnelName)
+			out, err := exec.Command("ip", "route", "list", "table", customRouteTableID).CombinedOutput()
 			if err != nil {
-				return fmt.Errorf("Route not injected for the route advertised by the node %s "+
-					"Failed to get tunnel interface by name error: %s", tunnelName, err)
+				return fmt.Errorf("Failed to verify if route already exists in %s table: %s",
+					customRouteTableName, err.Error())
 			}
-			if err := netlink.LinkSetUp(link); err != nil {
-				return errors.New("Failed to bring tunnel interface " + tunnelName + " up due to: " + err.Error())
-			}
-			// reduce the MTU by 20 bytes to accommodate ipip tunnel overhead
-			if err := netlink.LinkSetMTU(link, link.Attrs().MTU-20); err != nil {
-				return errors.New("Failed to set MTU of tunnel interface " + tunnelName + " up due to: " + err.Error())
-			}
-		} else {
-			glog.Infof("Tunnel interface: " + tunnelName + " for the node " + nexthop.String() + " already exists.")
-		}
-
-		out, err := exec.Command("ip", "route", "list", "table", customRouteTableID).CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("Failed to verify if route already exists in %s table: %s",
-				customRouteTableName, err.Error())
-		}
-		if !strings.Contains(string(out), "dev "+tunnelName+" scope") {
-			if out, err = exec.Command("ip", "route", "add", nexthop.String(), "dev", tunnelName, "table",
-				customRouteTableID).CombinedOutput(); err != nil {
-				return fmt.Errorf("failed to add route in custom route table, err: %s, output: %s", err, string(out))
+			if !strings.Contains(string(out), "dev "+tunnelName+" scope") {
+				if out, err = exec.Command("ip", "route", "add", nexthop.String(), "dev", tunnelName, "table",
+					customRouteTableID).CombinedOutput(); err != nil {
+					return fmt.Errorf("failed to add route in custom route table, err: %s, output: %s", err, string(out))
+				}
 			}
 		}
 
