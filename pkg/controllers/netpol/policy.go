@@ -40,7 +40,7 @@ func (npc *NetworkPolicyController) newNetworkPolicyEventHandler() cache.Resourc
 // OnNetworkPolicyUpdate handles updates to network policy from the kubernetes api server
 func (npc *NetworkPolicyController) OnNetworkPolicyUpdate(obj interface{}) {
 	netpol := obj.(*networking.NetworkPolicy)
-	glog.V(2).Infof("Received update for network policy: %s/%s", netpol.Namespace, netpol.Name)
+	glog.V(2).Infof("---- Received update for network policy: %s/%s", netpol.Namespace, netpol.Name)
 
 	npc.RequestFullSync()
 }
@@ -58,7 +58,7 @@ func (npc *NetworkPolicyController) handleNetworkPolicyDelete(obj interface{}) {
 			return
 		}
 	}
-	glog.V(2).Infof("Received network policy: %s/%s delete event", netpol.Namespace, netpol.Name)
+	glog.V(2).Infof("---- Received network policy: %s/%s delete event", netpol.Namespace, netpol.Name)
 
 	npc.RequestFullSync()
 }

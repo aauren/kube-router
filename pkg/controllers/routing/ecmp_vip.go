@@ -94,12 +94,27 @@ func (nrc *NetworkRoutingController) withdrawVIPs(vips []string) {
 func (nrc *NetworkRoutingController) newServiceEventHandler() cache.ResourceEventHandler {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
+			if glog.V(2) {
+				if svc, ok := obj.(*v1core.Service); ok {
+					glog.V(2).Infof("---- Received add to service: %s/%s", svc.Namespace, svc.Name)
+				}
+			}
 			nrc.OnServiceCreate(obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
+			if glog.V(2) {
+				if svc, ok := newObj.(*v1core.Service); ok {
+					glog.V(2).Infof("---- Received update to service: %s/%s", svc.Namespace, svc.Name)
+				}
+			}
 			nrc.OnServiceUpdate(newObj, oldObj)
 		},
 		DeleteFunc: func(obj interface{}) {
+			if glog.V(2) {
+				if svc, ok := obj.(*v1core.Service); ok {
+					glog.V(2).Infof("---- Received delete to service: %s/%s", svc.Namespace, svc.Name)
+				}
+			}
 			nrc.OnServiceDelete(obj)
 		},
 	}
@@ -255,9 +270,19 @@ func (nrc *NetworkRoutingController) OnServiceDelete(obj interface{}) {
 func (nrc *NetworkRoutingController) newEndpointsEventHandler() cache.ResourceEventHandler {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
+			if glog.V(2) {
+				if ep, ok := obj.(*v1core.Endpoints); ok {
+					glog.V(2).Infof("---- Received add to endpoint: %s/%s", ep.Namespace, ep.Name)
+				}
+			}
 			nrc.OnEndpointsAdd(obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
+			if glog.V(2) {
+				if ep, ok := newObj.(*v1core.Endpoints); ok {
+					glog.V(2).Infof("---- Received update to endpoint: %s/%s", ep.Namespace, ep.Name)
+				}
+			}
 			nrc.OnEndpointsUpdate(newObj)
 		},
 		DeleteFunc: func(obj interface{}) {

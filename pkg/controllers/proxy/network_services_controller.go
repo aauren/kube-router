@@ -382,7 +382,7 @@ func (nsc *NetworkServicesController) Run(healthChan chan<- *healthcheck.Control
 
 		case <-gracefulTicker.C:
 			if nsc.readyForUpdates && nsc.gracefulTermination {
-				glog.V(3).Info("Performing periodic graceful destination cleanup")
+				glog.V(3).Info("---- Performing periodic graceful destination cleanup")
 				nsc.gracefulSync()
 			}
 
@@ -390,13 +390,13 @@ func (nsc *NetworkServicesController) Run(healthChan chan<- *healthcheck.Control
 			healthcheck.SendHeartBeat(healthChan, "NSC")
 			switch perform {
 			case synctypeAll:
-				glog.V(1).Info("Performing requested full sync of services")
+				glog.V(1).Info("---- Performing requested full sync of services")
 				err := nsc.doSync()
 				if err != nil {
 					glog.Errorf("Error during full sync in network service controller. Error: " + err.Error())
 				}
 			case synctypeIpvs:
-				glog.V(1).Info("Performing requested sync of ipvs services")
+				glog.V(1).Info("---- Performing requested sync of ipvs services")
 				nsc.mu.Lock()
 				err := nsc.syncIpvsServices(nsc.serviceMap, nsc.endpointsMap)
 				nsc.mu.Unlock()
@@ -409,7 +409,7 @@ func (nsc *NetworkServicesController) Run(healthChan chan<- *healthcheck.Control
 			}
 
 		case <-t.C:
-			glog.V(1).Info("Performing periodic sync of ipvs services")
+			glog.V(1).Info("---- Performing periodic sync of ipvs services")
 			healthcheck.SendHeartBeat(healthChan, "NSC")
 			err := nsc.doSync()
 			if err != nil {
@@ -2379,6 +2379,7 @@ func (nsc *NetworkServicesController) handleEndpointsAdd(obj interface{}) {
 		glog.Errorf("unexpected object type: %v", obj)
 		return
 	}
+	glog.V(2).Infof("---- Received add for endpoints: %s/%s", endpoints.Namespace, endpoints.Name)
 	nsc.OnEndpointsUpdate(endpoints)
 }
 
@@ -2393,6 +2394,7 @@ func (nsc *NetworkServicesController) handleEndpointsUpdate(oldObj, newObj inter
 		glog.Errorf("unexpected object type: %v", newObj)
 		return
 	}
+	glog.V(2).Infof("---- Received update for endpoints: %s/%s", newEndpoints.Namespace, newEndpoints.Name)
 	nsc.OnEndpointsUpdate(newEndpoints)
 }
 
@@ -2409,6 +2411,7 @@ func (nsc *NetworkServicesController) handleEndpointsDelete(obj interface{}) {
 			return
 		}
 	}
+	glog.V(2).Infof("---- Received delete for endpoints: %s/%s", endpoints.Namespace, endpoints.Name)
 	nsc.OnEndpointsUpdate(endpoints)
 }
 
@@ -2432,6 +2435,7 @@ func (nsc *NetworkServicesController) handleServiceAdd(obj interface{}) {
 		glog.Errorf("unexpected object type: %v", obj)
 		return
 	}
+	glog.V(2).Infof("---- Received add for service: %s/%s", service.Namespace, service.Name)
 	nsc.OnServiceUpdate(service)
 }
 
@@ -2446,6 +2450,7 @@ func (nsc *NetworkServicesController) handleServiceUpdate(oldObj, newObj interfa
 		glog.Errorf("unexpected object type: %v", newObj)
 		return
 	}
+	glog.V(2).Infof("---- Received update for service: %s/%s", newService.Namespace, newService.Name)
 	nsc.OnServiceUpdate(newService)
 }
 
@@ -2462,6 +2467,7 @@ func (nsc *NetworkServicesController) handleServiceDelete(obj interface{}) {
 			return
 		}
 	}
+	glog.V(2).Infof("---- Received delete for service: %s/%s", service.Namespace, service.Name)
 	nsc.OnServiceUpdate(service)
 }
 

@@ -302,6 +302,7 @@ func (nrc *NetworkRoutingController) newNodeEventHandler() cache.ResourceEventHa
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			node := obj.(*v1core.Node)
+			glog.V(2).Infof("---- Received add node: %s", node.Name)
 			nodeIP, err := utils.GetNodeIP(node)
 			if err != nil {
 				glog.Errorf("New node received, but we were unable to add it as we were couldn't find it's node IP: %v", err)
@@ -316,6 +317,7 @@ func (nrc *NetworkRoutingController) newNodeEventHandler() cache.ResourceEventHa
 		},
 		DeleteFunc: func(obj interface{}) {
 			node, ok := obj.(*v1core.Node)
+			glog.V(2).Infof("---- Received delete node: %s", node.Name)
 			if !ok {
 				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {

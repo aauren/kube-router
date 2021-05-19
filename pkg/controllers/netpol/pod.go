@@ -14,8 +14,7 @@ import (
 func (npc *NetworkPolicyController) newPodEventHandler() cache.ResourceEventHandler {
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			npc.OnPodUpdate(obj)
-
+			npc.OnPodUpdate(obj, "add")
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			newPodObj := newObj.(*api.Pod)
@@ -24,7 +23,7 @@ func (npc *NetworkPolicyController) newPodEventHandler() cache.ResourceEventHand
 				newPodObj.Status.PodIP != oldPodObj.Status.PodIP ||
 				!reflect.DeepEqual(newPodObj.Labels, oldPodObj.Labels) {
 				// for the network policies, we are only interested in pod status phase change or IP change
-				npc.OnPodUpdate(newObj)
+				npc.OnPodUpdate(newObj, "update")
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -34,9 +33,9 @@ func (npc *NetworkPolicyController) newPodEventHandler() cache.ResourceEventHand
 }
 
 // OnPodUpdate handles updates to pods from the Kubernetes api server
-func (npc *NetworkPolicyController) OnPodUpdate(obj interface{}) {
+func (npc *NetworkPolicyController) OnPodUpdate(obj interface{}, updateType string) {
 	pod := obj.(*api.Pod)
-	glog.V(2).Infof("Received update to pod: %s/%s", pod.Namespace, pod.Name)
+	glog.V(2).Infof("---- Received %s to pod: %s/%s", updateType, pod.Namespace, pod.Name)
 
 	npc.RequestFullSync()
 }
@@ -54,7 +53,7 @@ func (npc *NetworkPolicyController) handlePodDelete(obj interface{}) {
 			return
 		}
 	}
-	glog.V(2).Infof("Received pod: %s/%s delete event", pod.Namespace, pod.Name)
+	glog.V(2).Infof("---- Received pod: %s/%s delete event", pod.Namespace, pod.Name)
 
 	npc.RequestFullSync()
 }

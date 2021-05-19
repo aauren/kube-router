@@ -37,7 +37,7 @@ func (npc *NetworkPolicyController) handleNamespaceAdd(obj *api.Namespace) {
 	if obj.Labels == nil {
 		return
 	}
-	glog.V(2).Infof("Received update for namespace: %s", obj.Name)
+	glog.V(2).Infof("---- Received update for namespace: %s", obj.Name)
 
 	npc.RequestFullSync()
 }
@@ -46,7 +46,7 @@ func (npc *NetworkPolicyController) handleNamespaceUpdate(oldObj, newObj *api.Na
 	if reflect.DeepEqual(oldObj.Labels, newObj.Labels) {
 		return
 	}
-	glog.V(2).Infof("Received update for namespace: %s", newObj.Name)
+	glog.V(2).Infof("---- Received update for namespace: %s", newObj.Name)
 
 	npc.RequestFullSync()
 }
@@ -55,7 +55,7 @@ func (npc *NetworkPolicyController) handleNamespaceDelete(obj *api.Namespace) {
 	if obj.Labels == nil {
 		return
 	}
-	glog.V(2).Infof("Received namespace: %s delete event", obj.Name)
+	glog.V(2).Infof("---- Received namespace: %s delete event", obj.Name)
 
 	npc.RequestFullSync()
 }
