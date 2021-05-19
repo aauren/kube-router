@@ -83,6 +83,7 @@ func (nsc *NetworkServicesController) addToGracefulQueue(req *gracefulRequest) {
 }
 
 func (nsc *NetworkServicesController) gracefulSync() {
+	glog.V(1).Info("---- START graceful ipvs sync")
 	nsc.gracefulQueue.mu.Lock()
 	defer nsc.gracefulQueue.mu.Unlock()
 	var newQueue []gracefulRequest
@@ -94,6 +95,7 @@ func (nsc *NetworkServicesController) gracefulSync() {
 		newQueue = append(newQueue, job)
 	}
 	nsc.gracefulQueue.queue = newQueue
+	glog.V(1).Info("---- END graceful ipvs sync")
 }
 
 func (nsc *NetworkServicesController) gracefulDeleteIpvsDestination(req gracefulRequest) bool {

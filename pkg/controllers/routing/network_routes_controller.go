@@ -285,6 +285,9 @@ func (nrc *NetworkRoutingController) Run(healthChan chan<- *healthcheck.Controll
 		default:
 		}
 
+		start := time.Now()
+		glog.V(1).Info("---- START sync of routes")
+
 		// Update ipset entries
 		if nrc.enablePodEgress || nrc.enableOverlays {
 			glog.V(1).Info("Syncing ipsets")
@@ -331,6 +334,8 @@ func (nrc *NetworkRoutingController) Run(healthChan chan<- *healthcheck.Controll
 			glog.Errorf("Error during periodic sync in network routing controller. Error: " + err.Error())
 			glog.Errorf("Skipping sending heartbeat from network routing controller as periodic sync failed.")
 		}
+		endTime := time.Since(start)
+		glog.V(1).Infof("---- END sync routes took %v", endTime)
 
 		select {
 		case <-stopCh:

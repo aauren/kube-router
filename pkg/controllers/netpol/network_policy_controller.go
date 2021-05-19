@@ -211,10 +211,10 @@ func (npc *NetworkPolicyController) fullPolicySync() {
 			metrics.ControllerIptablesSyncTotalTime.Add(endTime.Seconds())
 			metrics.ControllerIptablesSyncTotalCount.Add(1)
 		}
-		glog.V(1).Infof("sync iptables took %v", endTime)
+		glog.V(1).Infof("---- END sync iptables took %v", endTime)
 	}()
 
-	glog.V(1).Infof("Starting sync of iptables with version: %s", syncVersion)
+	glog.V(1).Infof("---- START sync of iptables with version: %s", syncVersion)
 
 	// ensure kube-router specific top level chains and corresponding rules exist
 	npc.ensureTopLevelChains()

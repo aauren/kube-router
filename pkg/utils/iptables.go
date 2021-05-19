@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"strings"
+
+	"github.com/golang/glog"
 )
 
 // SaveInto calls `iptables-save` for given table and stores result in a given buffer.
@@ -28,9 +31,17 @@ func SaveInto(table string, buffer *bytes.Buffer) error {
 
 // Restore runs `iptables-restore` passing data through []byte.
 func Restore(table string, data []byte) error {
+	glog.V(1).Infof("---- START iptables restore")
 	path, err := exec.LookPath("iptables-restore")
 	if err != nil {
 		return err
+	}
+	if glog.V(5) {
+		glog.V(5).Infof("---- IPTABLES %s DUMP START ----", table)
+		for _, iptablesLine := range strings.Split(string(data), "\n") {
+			glog.V(5).Infof("---- %s", iptablesLine)
+		}
+		glog.V(5).Infof("---- IPTABLES %s DUMP END ----", table)
 	}
 	args := []string{"iptables-restore", "-T", table}
 	cmd := exec.Cmd{
@@ -39,6 +50,7 @@ func Restore(table string, data []byte) error {
 		Stdin: bytes.NewBuffer(data),
 	}
 	b, err := cmd.CombinedOutput()
+	glog.V(1).Infof("---- END iptables restore")
 	if err != nil {
 		return fmt.Errorf("%v (%s)", err, b)
 	}

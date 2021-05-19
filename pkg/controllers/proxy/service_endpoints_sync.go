@@ -28,9 +28,10 @@ func (nsc *NetworkServicesController) syncIpvsServices(serviceInfoMap serviceInf
 		if nsc.MetricsEnabled {
 			metrics.ControllerIpvsServicesSyncTime.Observe(endTime.Seconds())
 		}
-		glog.V(1).Infof("sync ipvs services took %v", endTime)
+		glog.V(1).Infof("---- END ipvs services sync took %v", endTime)
 	}()
 
+	glog.V(1).Info("---- START ipvs services sync")
 	var err error
 	var syncErrors bool
 

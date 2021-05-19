@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+
+	"github.com/golang/glog"
 )
 
 var (
@@ -475,8 +477,18 @@ func (ipset *IPSet) Save() error {
 // mode except list, help, version, interactive mode and restore itself.
 // Send formated ipset.sets into stdin of "ipset restore" command.
 func (ipset *IPSet) Restore() error {
-	stdin := bytes.NewBufferString(buildIPSetRestore(ipset))
+	glog.V(1).Infof("---- START ipset restore")
+	ipsetTmp := buildIPSetRestore(ipset)
+	if glog.V(5) {
+		glog.V(5).Info("---- IPSET DUMP START ----")
+		for _, iptablesLine := range strings.Split(ipsetTmp, "\n") {
+			glog.V(5).Infof("---- %s", iptablesLine)
+		}
+		glog.V(5).Info("---- IPSET DUMP END ----")
+	}
+	stdin := bytes.NewBufferString(ipsetTmp)
 	_, err := ipset.runWithStdin(stdin, "restore", "-exist")
+	glog.V(1).Infof("---- END ipset restore")
 	if err != nil {
 		return err
 	}

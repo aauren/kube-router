@@ -17,6 +17,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/cloudnativelabs/kube-router/pkg/cri"
 	"github.com/cloudnativelabs/kube-router/pkg/healthcheck"
 	"github.com/cloudnativelabs/kube-router/pkg/metrics"
@@ -29,7 +31,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
-	"golang.org/x/net/context"
 	api "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -433,6 +434,7 @@ func (nsc *NetworkServicesController) doSync() error {
 	var err error
 	nsc.mu.Lock()
 	defer nsc.mu.Unlock()
+	glog.V(1).Info("---- START ipvs sync")
 
 	// enable masquerade rule
 	err = nsc.ensureMasqueradeIptablesRule()
@@ -460,6 +462,7 @@ func (nsc *NetworkServicesController) doSync() error {
 			return err
 		}
 	}
+	glog.V(1).Info("---- END ipvs sync")
 	return nil
 }
 
