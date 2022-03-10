@@ -284,7 +284,7 @@ If you would like to use `HostPort` functionality below changes are required in 
 - Update init container command to create `/etc/cni/net.d/10-kuberouter.conflist` file
 - Restart the container runtime
 
-For an e.g manifest please look at [manifest](../daemonset/kubeadm-kuberouter-all-features-hostport.yaml) with necessary changes required for `HostPort` functionality.
+For an e.g manifest please look at [manifest](manifests/kubeadm-kuberouter-all-features-hostport.yaml) with necessary changes required for `HostPort` functionality.
 
 ## IPVS Graceful termination support
 

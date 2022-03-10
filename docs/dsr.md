@@ -74,7 +74,7 @@ spec:
 ...
 ```
 
-For an example manifest please look at the [kube-router all features manifest](../daemonset/kubeadm-kuberouter-all-features-dsr.yaml) with DSR requirements for Docker enabled.
+For an example manifest please look at the [kube-router all features manifest](manifests/kubeadm-kuberouter-all-features-dsr.yaml) with DSR requirements for Docker enabled.
 
 ### DSR with containerd or cri-o
 
