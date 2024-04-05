@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -561,6 +563,7 @@ func (ipset *IPSet) Save() error {
 // Send formatted ipset.sets into stdin of "ipset restore" command.
 func (ipset *IPSet) Restore() error {
 	stdin := bytes.NewBufferString(buildIPSetRestore(ipset))
+	klog.V(4).Infof("ipset rules to save:\n%s", stdin)
 	err := ipset.runWithStdin(stdin, "restore", "-exist")
 	if err != nil {
 		return err

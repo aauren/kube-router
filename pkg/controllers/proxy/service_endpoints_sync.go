@@ -110,6 +110,14 @@ func (nsc *NetworkServicesController) setupClusterIPServices(serviceInfoMap serv
 		}
 
 		// create IPVS service for the service to be exposed through the cluster ip
+		cmdStart := time.Now()
+		defer func() {
+			cmdTime := time.Since(cmdStart)
+			if nsc.MetricsEnabled {
+				metrics.ControllerServicesIPVSCommandTime.Observe(cmdTime.Seconds())
+			}
+			klog.V(2).Infof("IPVS command time took: %v", cmdTime)
+		}()
 		ipvsClusterVipSvc, err := nsc.ln.ipvsAddService(ipvsSvcs, svc.clusterIP, protocol, uint16(svc.port),
 			svc.sessionAffinity, svc.sessionAffinityTimeoutSeconds, svc.scheduler, svc.flags)
 		if err != nil {
@@ -173,6 +181,15 @@ func (nsc *NetworkServicesController) setupNodePortServices(serviceInfoMap servi
 		var ipvsNodeportSvcs []*ipvs.Service
 
 		var nodeServiceIds []string
+
+		cmdStart := time.Now()
+		defer func() {
+			cmdTime := time.Since(cmdStart)
+			if nsc.MetricsEnabled {
+				metrics.ControllerServicesIPVSCommandTime.Observe(cmdTime.Seconds())
+			}
+			klog.V(2).Infof("IPVS command time took: %v", cmdTime)
+		}()
 
 		if nsc.nodeportBindOnAllIP {
 			// bind on all interfaces instead
@@ -320,6 +337,15 @@ func (nsc *NetworkServicesController) setupExternalIPForService(svc *serviceInfo
 			externalIP, KubeDummyIf, err)
 	}
 
+	cmdStart := time.Now()
+	defer func() {
+		cmdTime := time.Since(cmdStart)
+		if nsc.MetricsEnabled {
+			metrics.ControllerServicesIPVSCommandTime.Observe(cmdTime.Seconds())
+		}
+		klog.V(2).Infof("IPVS command time took: %v", cmdTime)
+	}()
+
 	// create IPVS service for the service to be exposed through the external ip
 	ipvsExternalIPSvc, err := nsc.ln.ipvsAddService(ipvsSvcs, net.ParseIP(externalIP), protocol,
 		uint16(svc.port), svc.sessionAffinity, svc.sessionAffinityTimeoutSeconds, svc.scheduler, svc.flags)
@@ -390,21 +416,33 @@ func (nsc *NetworkServicesController) setupExternalIPForDSRService(svc *serviceI
 	if err != nil {
 		return fmt.Errorf("failed to generate FW mark")
 	}
+	ipvsCmdStart := time.Now()
 	ipvsExternalIPSvc, err := nsc.ln.ipvsAddFWMarkService(ipvsSvcs, fwMark, protocol, uint16(svc.port),
 		svc.sessionAffinity, svc.sessionAffinityTimeoutSeconds, svc.scheduler, svc.flags)
 	if err != nil {
 		return fmt.Errorf("failed to create IPVS service for External IP: %s due to: %s",
 			externalIP, err.Error())
 	}
+	ipvsCmdTime := time.Since(ipvsCmdStart)
+	if nsc.MetricsEnabled {
+		metrics.ControllerServicesIPVSCommandTime.Observe(ipvsCmdTime.Seconds())
+	}
+	klog.V(2).Infof("IPVS command time took: %v", ipvsCmdTime)
 
 	externalIPServiceID := fmt.Sprint(fwMark)
 
 	// ensure there is iptables mangle table rule to FWMARK the packet
+	iptablesCmdStart := time.Now()
 	err = setupMangleTableRule(externalIP, svc.protocol, strconv.Itoa(svc.port), externalIPServiceID,
 		nsc.dsrTCPMSS)
 	if err != nil {
 		return fmt.Errorf("failed to setup mangle table rule to forward the traffic to external IP")
 	}
+	iptablesCmdTime := time.Since(iptablesCmdStart)
+	if nsc.MetricsEnabled {
+		metrics.ControllerServicesIPTablesCommandTime.Observe(iptablesCmdTime.Seconds())
+	}
+	klog.V(2).Infof("IPTables command time took: %v", iptablesCmdTime)
 
 	// ensure VIP less director. we dont assign VIP to any interface
 	err = nsc.ln.ipAddrDel(dummyVipInterface, externalIP)
@@ -420,6 +458,14 @@ func (nsc *NetworkServicesController) setupExternalIPForDSRService(svc *serviceI
 	}
 
 	// add pod endpoints to the IPVS service
+	ipvsCmdStart = time.Now()
+	defer func() {
+		ipvsCmdTime := time.Since(ipvsCmdStart)
+		if nsc.MetricsEnabled {
+			metrics.ControllerServicesIPVSCommandTime.Observe(ipvsCmdTime.Seconds())
+		}
+		klog.V(2).Infof("IPVS command time took: %v", ipvsCmdTime)
+	}()
 	for _, endpoint := range endpoints {
 		// if this specific endpoint isn't local, there is nothing for us to do and we can go to the next record
 		if svc.local && !endpoint.isLocal {
@@ -512,6 +558,14 @@ func (nsc *NetworkServicesController) cleanupStaleVIPs(activeServiceEndpointMap 
 }
 
 func (nsc *NetworkServicesController) cleanupStaleIPVSConfig(activeServiceEndpointMap map[string][]string) error {
+	cmdStart := time.Now()
+	defer func() {
+		cmdTime := time.Since(cmdStart)
+		if nsc.MetricsEnabled {
+			metrics.ControllerServicesIPVSCommandTime.Observe(cmdTime.Seconds())
+		}
+		klog.V(2).Infof("IPVS command time took: %v", cmdTime)
+	}()
 	ipvsSvcs, err := nsc.ln.ipvsGetServices()
 	if err != nil {
 		return errors.New("failed get list of IPVS services due to: " + err.Error())
@@ -615,6 +669,14 @@ func (nsc *NetworkServicesController) cleanupDSRService(fwMark uint32) error {
 	}
 
 	// cleanup mangle rules
+	cmdStart := time.Now()
+	defer func() {
+		cmdTime := time.Since(cmdStart)
+		if nsc.MetricsEnabled {
+			metrics.ControllerServicesIPTablesCommandTime.Observe(cmdTime.Seconds())
+		}
+		klog.V(2).Infof("IPTables command time took: %v", cmdTime)
+	}()
 	klog.V(2).Infof("service %s:%s:%d was found, continuing with DSR service cleanup", ipAddress, proto, port)
 	mangleTableRulesDump := bytes.Buffer{}
 	var mangleTableRules []string

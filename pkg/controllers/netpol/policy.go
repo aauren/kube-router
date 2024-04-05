@@ -89,7 +89,14 @@ func (npc *NetworkPolicyController) syncNetworkPolicyChains(networkPoliciesInfo 
 	if err != nil {
 		return nil, nil, err
 	}
+
+	saveStart := time.Now()
 	err = ipset.Save()
+	saveTime := time.Since(saveStart)
+	if npc.MetricsEnabled {
+		metrics.ControllerPolicyIPSetSaveTime.Observe(saveTime.Seconds())
+	}
+	klog.V(2).Infof("Save ipset took: %v", saveTime)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -134,7 +141,13 @@ func (npc *NetworkPolicyController) syncNetworkPolicyChains(networkPoliciesInfo 
 		}
 	}
 
+	restoreStart := time.Now()
 	err = npc.ipSetHandler.Restore()
+	restoreTime := time.Since(restoreStart)
+	if npc.MetricsEnabled {
+		metrics.ControllerPolicyIPSetRestoreTime.Observe(restoreTime.Seconds())
+	}
+	klog.V(2).Infof("Restoring ipset took: %v", restoreTime)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to perform ipset restore: %s", err.Error())
 	}

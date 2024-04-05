@@ -112,6 +112,18 @@ var (
 		Name:      "controller_routes_sync_time",
 		Help:      "Time it took for controller to sync routes",
 	})
+	// ControllerRoutesIPSetCommandTime Time it took for controller to run IPSet commands
+	ControllerRoutesIPSetCommandTime = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      "controller_routes_ipset_command_time",
+		Help:      "Time it took for routes controller to execute individual ipset commands in the OS in seconds",
+	})
+	// ControllerRoutesIPTablesCommandTime Time it took for the controller to run IPTables commands
+	ControllerRoutesIPTablesCommandTime = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      "controller_routes_iptables_command_time",
+		Help:      "Time it took routes controller to execute individual iptables commands in the OS in seconds",
+	})
 	// ControllerBPGpeers BGP peers in the runtime configuration
 	ControllerBPGpeers = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
@@ -142,11 +154,65 @@ var (
 		Name:      "controller_ipvs_metrics_export_time",
 		Help:      "Time it took to export metrics",
 	})
+	// ControllerServicesIPSetCommandTime Time it took for services controller to run IPSet commands
+	ControllerServicesIPSetCommandTime = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      "controller_services_ipset_command_time",
+		Help:      "Time it took for services controller to execute individual ipset commands in the OS in seconds",
+	})
+	// ControllerServicesIPTablesCommandTime Time it took for services controller to run IPTables commands
+	ControllerServicesIPTablesCommandTime = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      "controller_services_iptables_command_time",
+		Help:      "Time it took services controller to execute individual iptables commands in the OS in seconds",
+	})
+	// ControllerServicesIPVSCommandTime Time it took for services controller to run IPVS commands
+	ControllerServicesIPVSCommandTime = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      "controller_services_ipvs_command_time",
+		Help:      "Time it took services controller to execute individual ipvs commands in the OS in seconds",
+	})
 	// ControllerPolicyChainsSyncTime Time it took for controller to sync policys
 	ControllerPolicyChainsSyncTime = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespace,
 		Name:      "controller_policy_chains_sync_time",
-		Help:      "Time it took for controller to sync policy chains",
+		Help:      "Time it took for policy controller to sync policy chains in seconds",
+	})
+	// ControllerPolicyIPTablesCommandTime Time it took for policy controller to run IPTables commands
+	ControllerPolicyIPTablesCommandTime = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      "controller_policy_iptables_command_time",
+		Help:      "Time it took policy controller to execute individual iptables commands in the OS in seconds",
+	})
+	// ControllerPolicyIPTablesRestoreTime Time it took for the policy controller to run IPTables restores
+	ControllerPolicyIPTablesRestoreTime = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      "controller_policy_iptables_restore_time",
+		Help:      "Time it took policy controller to restore iptables to the OS in seconds",
+	})
+	// ControllerPolicyIPSetSaveTime Time it took for the policy controller to run IPTables saves
+	ControllerPolicyIPTablesSaveTime = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      "controller_policy_iptables_save_time",
+		Help:      "Time it took policy controller to save iptables from the OS in seconds",
+	})
+	// ControllerPolicyIPSetRestoreTime Time it took for the policy controller to run IPSet restores
+	ControllerPolicyIPSetRestoreTime = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      "controller_policy_ipset_restore_time",
+		Help:      "Time it took policy controller to restore ipset to the OS in seconds",
+	})
+	// ControllerPolicyIPSetSaveTime Time it took for the policy controller to run IPSet saves
+	ControllerPolicyIPSetSaveTime = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      "controller_policy_ipset_save_time",
+		Help:      "Time it took policy controller to save ipset from the OS in seconds",
+	})
+	// ControllerPolicyIPSetCommandTime Time it took for the policy controller to run IPSet commands
+	ControllerPolicyIPSetCommandTime = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      "controller_policy_ipset_command_time",
+		Help:      "Time it took policy controller to delete ipsets from the OS in seconds",
 	})
 )
 

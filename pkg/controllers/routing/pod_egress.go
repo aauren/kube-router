@@ -3,6 +3,9 @@ package routing
 import (
 	"errors"
 	"fmt"
+	"time"
+
+	"github.com/cloudnativelabs/kube-router/pkg/metrics"
 
 	"k8s.io/klog/v2"
 )
@@ -36,6 +39,16 @@ func (nrc *NetworkRoutingController) createPodEgressRule() error {
 	if nrc.isIpv6 {
 		podEgressArgs = podEgressArgs6
 	}
+
+	cmdStart := time.Now()
+	defer func() {
+		cmdTime := time.Since(cmdStart)
+		if nrc.MetricsEnabled {
+			metrics.ControllerRoutesIPTablesCommandTime.Observe(cmdTime.Seconds())
+		}
+		klog.V(2).Infof("IPTables command time took: %v", cmdTime)
+	}()
+
 	if iptablesCmdHandler.HasRandomFully() {
 		podEgressArgs = append(podEgressArgs, "--random-fully")
 	}
@@ -61,6 +74,16 @@ func (nrc *NetworkRoutingController) deletePodEgressRule() error {
 	if nrc.isIpv6 {
 		podEgressArgs = podEgressArgs6
 	}
+
+	cmdStart := time.Now()
+	defer func() {
+		cmdTime := time.Since(cmdStart)
+		if nrc.MetricsEnabled {
+			metrics.ControllerRoutesIPTablesCommandTime.Observe(cmdTime.Seconds())
+		}
+		klog.V(2).Infof("IPTables command time took: %v", cmdTime)
+	}()
+
 	if iptablesCmdHandler.HasRandomFully() {
 		podEgressArgs = append(podEgressArgs, "--random-fully")
 	}
@@ -91,6 +114,15 @@ func (nrc *NetworkRoutingController) deleteBadPodEgressRules() error {
 	if nrc.isIpv6 {
 		podEgressArgsBad = podEgressArgsBad6
 	}
+
+	cmdStart := time.Now()
+	defer func() {
+		cmdTime := time.Since(cmdStart)
+		if nrc.MetricsEnabled {
+			metrics.ControllerRoutesIPTablesCommandTime.Observe(cmdTime.Seconds())
+		}
+		klog.V(2).Infof("IPTables command time took: %v", cmdTime)
+	}()
 
 	// If random fully is supported remove the original rule as well
 	if iptablesCmdHandler.HasRandomFully() {

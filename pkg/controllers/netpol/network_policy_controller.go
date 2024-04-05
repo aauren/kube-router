@@ -249,10 +249,16 @@ func (npc *NetworkPolicyController) fullPolicySync() {
 	}
 
 	npc.filterTableRules.Reset()
+	saveStart := time.Now()
 	if err := utils.SaveInto("filter", &npc.filterTableRules); err != nil {
 		klog.Errorf("Aborting sync. Failed to run iptables-save: %v" + err.Error())
 		return
 	}
+	saveTime := time.Since(saveStart)
+	if npc.MetricsEnabled {
+		metrics.ControllerPolicyIPTablesSaveTime.Observe(saveTime.Seconds())
+	}
+	klog.V(2).Infof("IPTables save time took: %v", saveTime)
 
 	activePolicyChains, activePolicyIPSets, err := npc.syncNetworkPolicyChains(networkPoliciesInfo, syncVersion)
 	if err != nil {
@@ -272,11 +278,17 @@ func (npc *NetworkPolicyController) fullPolicySync() {
 		return
 	}
 
+	restoreStart := time.Now()
 	if err := utils.Restore("filter", npc.filterTableRules.Bytes()); err != nil {
 		klog.Errorf("Aborting sync. Failed to run iptables-restore: %v\n%s",
 			err.Error(), npc.filterTableRules.String())
 		return
 	}
+	restoreTime := time.Since(restoreStart)
+	if npc.MetricsEnabled {
+		metrics.ControllerPolicyIPTablesRestoreTime.Observe(restoreTime.Seconds())
+	}
+	klog.V(2).Infof("IPTables restore time took: %v", restoreTime)
 
 	err = npc.cleanupStaleIPSets(activePolicyIPSets)
 	if err != nil {
@@ -315,6 +327,14 @@ func (npc *NetworkPolicyController) ensureTopLevelChains() {
 	}
 
 	ensureRuleAtPosition := func(chain string, ruleSpec []string, uuid string, position int) {
+		cmdStart := time.Now()
+		defer func() {
+			cmdTime := time.Since(cmdStart)
+			if npc.MetricsEnabled {
+				metrics.ControllerPolicyIPTablesCommandTime.Observe(cmdTime.Seconds())
+			}
+			klog.V(2).Infof("IPTables command time took: %v", cmdTime)
+		}()
 		exists, err := iptablesCmdHandler.Exists("filter", chain, ruleSpec...)
 		if err != nil {
 			klog.Fatalf("Failed to verify rule exists in %s chain due to %s", chain, err.Error())
@@ -359,6 +379,7 @@ func (npc *NetworkPolicyController) ensureTopLevelChains() {
 	}
 
 	for builtinChain, customChain := range defaultChains {
+		cmdStart := time.Now()
 		exists, err := iptablesCmdHandler.ChainExists("filter", customChain)
 		if err != nil {
 			klog.Fatalf("failed to check for the existence of chain %s, error: %v", customChain, err)
@@ -370,6 +391,11 @@ func (npc *NetworkPolicyController) ensureTopLevelChains() {
 					err.Error())
 			}
 		}
+		cmdTime := time.Since(cmdStart)
+		if npc.MetricsEnabled {
+			metrics.ControllerPolicyIPTablesCommandTime.Observe(cmdTime.Seconds())
+		}
+		klog.V(2).Infof("IPTables command time took: %v", cmdTime)
 		args := []string{"-m", "comment", "--comment", "kube-router netpol", "-j", customChain}
 		uuid, err := addUUIDForRuleSpec(builtinChain, &args)
 		if err != nil {
@@ -419,6 +445,14 @@ func (npc *NetworkPolicyController) ensureTopLevelChains() {
 func (npc *NetworkPolicyController) ensureExplicitAccept() {
 	// for the traffic to/from the local pod's let network policy controller be
 	// authoritative entity to ACCEPT the traffic if it complies to network policies
+	cmdStart := time.Now()
+	defer func() {
+		cmdTime := time.Since(cmdStart)
+		if npc.MetricsEnabled {
+			metrics.ControllerPolicyIPTablesCommandTime.Observe(cmdTime.Seconds())
+		}
+		klog.V(2).Infof("IPTables command time took: %v", cmdTime)
+	}()
 	for _, chain := range defaultChains {
 		args := []string{"-m", "comment", "--comment", "\"explicitly ACCEPT traffic that complies with network policies\"",
 			"-m", "mark", "--mark", "0x20000/0x20000", "-j", "ACCEPT"}
@@ -439,6 +473,14 @@ func (npc *NetworkPolicyController) ensureDefaultNetworkPolicyChain() {
 	markArgs = append(markArgs, "-j", "MARK", "-m", "comment", "--comment", markComment,
 		"--set-xmark", "0x10000/0x10000")
 
+	cmdStart := time.Now()
+	defer func() {
+		cmdTime := time.Since(cmdStart)
+		if npc.MetricsEnabled {
+			metrics.ControllerPolicyIPTablesCommandTime.Observe(cmdTime.Seconds())
+		}
+		klog.V(2).Infof("IPTables command time took: %v", cmdTime)
+	}()
 	exists, err := iptablesCmdHandler.ChainExists("filter", kubeDefaultNetpolChain)
 	if err != nil {
 		klog.Fatalf("failed to check for the existence of chain %s, error: %v", kubeDefaultNetpolChain, err)
@@ -469,7 +511,13 @@ func (npc *NetworkPolicyController) cleanupStaleRules(activePolicyChains, active
 	}
 
 	// find iptables chains and ipsets that are no longer used by comparing current to the active maps we were passed
+	cmdStart := time.Now()
 	chains, err := iptablesCmdHandler.ListChains("filter")
+	cmdTime := time.Since(cmdStart)
+	if npc.MetricsEnabled {
+		metrics.ControllerPolicyIPTablesCommandTime.Observe(cmdTime.Seconds())
+	}
+	klog.V(2).Infof("IPTables command time took: %v", cmdTime)
 	if err != nil {
 		return fmt.Errorf("unable to list chains: %s", err)
 	}
@@ -561,7 +609,13 @@ func (npc *NetworkPolicyController) cleanupStaleIPSets(activePolicyIPSets map[st
 	if err != nil {
 		return fmt.Errorf("failed to create ipsets command executor due to %s", err.Error())
 	}
+	saveStart := time.Now()
 	err = ipsets.Save()
+	saveTime := time.Since(saveStart)
+	if npc.MetricsEnabled {
+		metrics.ControllerPolicyIPSetSaveTime.Observe(saveTime.Seconds())
+	}
+	klog.V(2).Infof("Save ipset took: %v", saveTime)
 	if err != nil {
 		klog.Fatalf("failed to initialize ipsets command executor due to %s", err.Error())
 	}
@@ -575,7 +629,13 @@ func (npc *NetworkPolicyController) cleanupStaleIPSets(activePolicyIPSets map[st
 	}
 	// cleanup network policy ipsets
 	for _, set := range cleanupPolicyIPSets {
+		deleteStart := time.Now()
 		err = set.Destroy()
+		saveTime := time.Since(deleteStart)
+		if npc.MetricsEnabled {
+			metrics.ControllerPolicyIPSetCommandTime.Observe(saveTime.Seconds())
+		}
+		klog.V(2).Infof("Delete ipset took: %v", saveTime)
 		if err != nil {
 			return fmt.Errorf("failed to delete ipset %s due to %s", set.Name, err)
 		}
@@ -589,10 +649,17 @@ func (npc *NetworkPolicyController) Cleanup() {
 
 	var emptySet map[string]bool
 	// Take a dump (iptables-save) of the current filter table for cleanupStaleRules() to work on
+	saveStart := time.Now()
 	if err := utils.SaveInto("filter", &npc.filterTableRules); err != nil {
 		klog.Errorf("error encountered attempting to list iptables rules for cleanup: %v", err)
 		return
 	}
+	saveTime := time.Since(saveStart)
+	if npc.MetricsEnabled {
+		metrics.ControllerPolicyIPTablesSaveTime.Observe(saveTime.Seconds())
+	}
+	klog.V(2).Infof("IPTables save time took: %v", saveTime)
+
 	// Run cleanupStaleRules() to get rid of most of the kube-router rules (this is the same logic that runs as
 	// part NPC's runtime loop). Setting the last parameter to true causes even the default chains are removed.
 	err := npc.cleanupStaleRules(emptySet, emptySet, true)
@@ -601,11 +668,17 @@ func (npc *NetworkPolicyController) Cleanup() {
 		return
 	}
 	// Restore (iptables-restore) npc's cleaned up version of the iptables filter chain
+	restoreStart := time.Now()
 	if err = utils.Restore("filter", npc.filterTableRules.Bytes()); err != nil {
 		klog.Errorf(
 			"error encountered while loading running iptables-restore: %v\n%s", err,
 			npc.filterTableRules.String())
 	}
+	restoreTime := time.Since(restoreStart)
+	if npc.MetricsEnabled {
+		metrics.ControllerPolicyIPTablesRestoreTime.Observe(restoreTime.Seconds())
+	}
+	klog.V(2).Infof("IPTables restore time took: %v", restoreTime)
 
 	// Cleanup ipsets
 	err = npc.cleanupStaleIPSets(emptySet)
@@ -655,6 +728,12 @@ func NewNetworkPolicyController(clientset kubernetes.Interface,
 		// Register the metrics for this controller
 		prometheus.MustRegister(metrics.ControllerIptablesSyncTime)
 		prometheus.MustRegister(metrics.ControllerPolicyChainsSyncTime)
+		prometheus.MustRegister(metrics.ControllerPolicyIPTablesCommandTime)
+		prometheus.MustRegister(metrics.ControllerPolicyIPTablesRestoreTime)
+		prometheus.MustRegister(metrics.ControllerPolicyIPTablesSaveTime)
+		prometheus.MustRegister(metrics.ControllerPolicyIPSetRestoreTime)
+		prometheus.MustRegister(metrics.ControllerPolicyIPSetSaveTime)
+		prometheus.MustRegister(metrics.ControllerPolicyIPSetCommandTime)
 		npc.MetricsEnabled = true
 	}
 

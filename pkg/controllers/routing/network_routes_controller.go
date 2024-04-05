@@ -754,6 +754,14 @@ func (nrc *NetworkRoutingController) Cleanup() {
 			klog.V(1).Infof("Returned ipset mutex lock")
 		}()
 	}
+	cmdStart := time.Now()
+	defer func() {
+		cmdTime := time.Since(cmdStart)
+		if nrc.MetricsEnabled {
+			metrics.ControllerRoutesIPSetCommandTime.Observe(cmdTime.Seconds())
+		}
+		klog.V(2).Infof("IPSet command time took: %v", cmdTime)
+	}()
 	ipset, err := utils.NewIPSet(nrc.isIpv6)
 	if err != nil {
 		klog.Errorf("Failed to clean up ipsets: " + err.Error())
@@ -812,6 +820,14 @@ func (nrc *NetworkRoutingController) syncNodeIPSets() error {
 	}
 
 	// Syncing Pod subnet ipset entries
+	cmdStart := time.Now()
+	defer func() {
+		cmdTime := time.Since(cmdStart)
+		if nrc.MetricsEnabled {
+			metrics.ControllerRoutesIPSetCommandTime.Observe(cmdTime.Seconds())
+		}
+		klog.V(2).Infof("IPSet command time took: %v", cmdTime)
+	}()
 	psSet := nrc.ipSetHandler.Get(podSubnetsIPSetName)
 	if psSet == nil {
 		klog.Infof("Creating missing ipset \"%s\"", podSubnetsIPSetName)
@@ -863,6 +879,14 @@ func (nrc *NetworkRoutingController) newIptablesCmdHandler() (*iptables.IPTables
 // this rules will be appended so that any iptables rules for network policies will take
 // precedence
 func (nrc *NetworkRoutingController) enableForwarding() error {
+	cmdStart := time.Now()
+	defer func() {
+		cmdTime := time.Since(cmdStart)
+		if nrc.MetricsEnabled {
+			metrics.ControllerRoutesIPTablesCommandTime.Observe(cmdTime.Seconds())
+		}
+		klog.V(2).Infof("IPTables command time took: %v", cmdTime)
+	}()
 
 	iptablesCmdHandler, _ := nrc.newIptablesCmdHandler()
 
@@ -1196,6 +1220,8 @@ func NewNetworkRoutingController(clientset kubernetes.Interface,
 		prometheus.MustRegister(metrics.ControllerBGPInternalPeersSyncTime)
 		prometheus.MustRegister(metrics.ControllerBPGpeers)
 		prometheus.MustRegister(metrics.ControllerRoutesSyncTime)
+		prometheus.MustRegister(metrics.ControllerRoutesIPSetCommandTime)
+		prometheus.MustRegister(metrics.ControllerRoutesIPTablesCommandTime)
 		nrc.MetricsEnabled = true
 	}
 

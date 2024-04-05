@@ -548,6 +548,7 @@ func (nsc *NetworkServicesController) setupIpvsFirewall() error {
 	nsc.ipsetMap = make(map[string]*utils.Set)
 
 	// Create ipset for local addresses.
+	ipsetCmdStart := time.Now()
 	ipset, err = ipSetHandler.Create(localIPsIPSetName, utils.TypeHashIP, utils.OptionTimeout, "0")
 	if err != nil {
 		return fmt.Errorf("failed to create ipset: %s", err.Error())
@@ -566,9 +567,22 @@ func (nsc *NetworkServicesController) setupIpvsFirewall() error {
 		return fmt.Errorf("failed to create ipset: %s", err.Error())
 	}
 	nsc.ipsetMap[ipvsServicesIPSetName] = ipset
+	ipsetCmdTime := time.Since(ipsetCmdStart)
+	if nsc.MetricsEnabled {
+		metrics.ControllerServicesIPSetCommandTime.Observe(ipsetCmdTime.Seconds())
+	}
+	klog.V(2).Infof("IPSet command time took: %v", ipsetCmdTime)
 
 	// Setup a custom iptables chain to explicitly allow input traffic to
 	// ipvs services only.
+	iptablesCmdStart := time.Now()
+	defer func() {
+		iptablesCmdTime := time.Since(iptablesCmdStart)
+		if nsc.MetricsEnabled {
+			metrics.ControllerServicesIPTablesCommandTime.Observe(iptablesCmdTime.Seconds())
+		}
+		klog.V(2).Infof("IPTables command time took: %v", iptablesCmdTime)
+	}()
 	iptablesCmdHandler, err := iptables.New()
 	if err != nil {
 		return errors.New("failed to initialize iptables executor" + err.Error())
@@ -660,6 +674,7 @@ func (nsc *NetworkServicesController) setupIpvsFirewall() error {
 
 func (nsc *NetworkServicesController) cleanupIpvsFirewall() {
 	// Clear iptables rules
+	iptablesCmdStart := time.Now()
 	iptablesCmdHandler, err := iptables.New()
 	if err != nil {
 		klog.Errorf("failed to initialize iptables executor: %v", err)
@@ -691,6 +706,11 @@ func (nsc *NetworkServicesController) cleanupIpvsFirewall() {
 			}
 		}
 	}
+	iptablesCmdTime := time.Since(iptablesCmdStart)
+	if nsc.MetricsEnabled {
+		metrics.ControllerServicesIPSetCommandTime.Observe(iptablesCmdTime.Seconds())
+	}
+	klog.V(2).Infof("IPTables command time took: %v", iptablesCmdTime)
 
 	// For some reason, if we go too fast into the ipset logic below it causes the system to think that the above
 	// iptables rules are still referencing the ipsets below, and we get errors
@@ -709,6 +729,14 @@ func (nsc *NetworkServicesController) cleanupIpvsFirewall() {
 			klog.V(1).Infof("Returned ipset mutex lock")
 		}()
 	}
+	cmdStart := time.Now()
+	defer func() {
+		cmdTime := time.Since(cmdStart)
+		if nsc.MetricsEnabled {
+			metrics.ControllerServicesIPSetCommandTime.Observe(cmdTime.Seconds())
+		}
+		klog.V(2).Infof("IPSet command time took: %v", cmdTime)
+	}()
 	ipSetHandler, err := utils.NewIPSet(false)
 	if err != nil {
 		klog.Errorf("Failed to initialize ipset handler: %s", err.Error())
@@ -766,12 +794,19 @@ func (nsc *NetworkServicesController) syncIpvsFirewall() error {
 	for _, addr := range addrs {
 		localIPsSets = append(localIPsSets, addr.IP.String())
 	}
+	ipsetCmdStart := time.Now()
 	err = localIPsIPSet.Refresh(localIPsSets)
+	ipsetCmdTime := time.Since(ipsetCmdStart)
+	if nsc.MetricsEnabled {
+		metrics.ControllerServicesIPSetCommandTime.Observe(ipsetCmdTime.Seconds())
+	}
+	klog.V(2).Infof("IPTables command time took: %v", ipsetCmdTime)
 	if err != nil {
 		return fmt.Errorf("failed to sync ipset: %s", err.Error())
 	}
 
 	// Populate service ipsets.
+	ipvsCmdStart := time.Now()
 	ipvsServices, err := nsc.ln.ipvsGetServices()
 	if err != nil {
 		return errors.New("Failed to list IPVS services: " + err.Error())
@@ -808,7 +843,20 @@ func (nsc *NetworkServicesController) syncIpvsFirewall() error {
 		ipvsServicesSets = append(ipvsServicesSets, ipvsServicesSet)
 
 	}
+	ipvsCmdTime := time.Since(ipvsCmdStart)
+	if nsc.MetricsEnabled {
+		metrics.ControllerServicesIPVSCommandTime.Observe(ipvsCmdTime.Seconds())
+	}
+	klog.V(2).Infof("IPVS command time took: %v", ipvsCmdTime)
 
+	ipsetCmdStart = time.Now()
+	defer func() {
+		ipsetCmdTime := time.Since(ipsetCmdStart)
+		if nsc.MetricsEnabled {
+			metrics.ControllerServicesIPSetCommandTime.Observe(ipsetCmdTime.Seconds())
+		}
+		klog.V(2).Infof("IPSet command time took: %v", ipsetCmdTime)
+	}()
 	serviceIPsIPSet := nsc.ipsetMap[serviceIPsIPSetName]
 	err = serviceIPsIPSet.Refresh(serviceIPsSets)
 	if err != nil {
@@ -1237,6 +1285,14 @@ func (nsc *NetworkServicesController) buildEndpointsInfo() endpointsInfoMap {
 // to go through the director for its functioning. So the masquerade rule ensures source IP is modified
 // to node ip, so return traffic from real server (endpoint pods) hits the node/lvs director
 func (nsc *NetworkServicesController) ensureMasqueradeIptablesRule() error {
+	cmdStart := time.Now()
+	defer func() {
+		cmdTime := time.Since(cmdStart)
+		if nsc.MetricsEnabled {
+			metrics.ControllerServicesIPTablesCommandTime.Observe(cmdTime.Seconds())
+		}
+		klog.V(2).Infof("IPTables command time took: %v", cmdTime)
+	}()
 	iptablesCmdHandler, err := iptables.New()
 	if err != nil {
 		return errors.New("Failed to initialize iptables executor" + err.Error())
@@ -1285,6 +1341,14 @@ func (nsc *NetworkServicesController) ensureMasqueradeIptablesRule() error {
 
 // Delete old/bad iptables rules to masquerade outbound IPVS traffic.
 func (nsc *NetworkServicesController) deleteBadMasqueradeIptablesRules() error {
+	cmdStart := time.Now()
+	defer func() {
+		cmdTime := time.Since(cmdStart)
+		if nsc.MetricsEnabled {
+			metrics.ControllerServicesIPTablesCommandTime.Observe(cmdTime.Seconds())
+		}
+		klog.V(2).Infof("IPTables command time took: %v", cmdTime)
+	}()
 	iptablesCmdHandler, err := iptables.New()
 	if err != nil {
 		return errors.New("Failed create iptables handler:" + err.Error())
@@ -1376,6 +1440,15 @@ func (nsc *NetworkServicesController) syncHairpinIptablesRules() error {
 			}
 		}
 	}
+
+	cmdStart := time.Now()
+	defer func() {
+		cmdTime := time.Since(cmdStart)
+		if nsc.MetricsEnabled {
+			metrics.ControllerServicesIPTablesCommandTime.Observe(cmdTime.Seconds())
+		}
+		klog.V(2).Infof("IPTables command time took: %v", cmdTime)
+	}()
 
 	// Cleanup (if needed) and return if there's no hairpin-mode Services
 	if len(rulesNeeded) == 0 {
@@ -2090,6 +2163,7 @@ func (nsc *NetworkServicesController) Cleanup() {
 	klog.Infof("Cleaning up NetworkServiceController configurations...")
 
 	// cleanup ipvs rules by flush
+	ipvsCmdStart := time.Now()
 	handle, err := ipvs.New("")
 	if err != nil {
 		klog.Errorf("failed to get ipvs handle for cleaning ipvs definitions: %v", err)
@@ -2102,6 +2176,13 @@ func (nsc *NetworkServicesController) Cleanup() {
 		}
 		handle.Close()
 	}
+	ipvsCmdTime := time.Since(ipvsCmdStart)
+	if nsc.MetricsEnabled {
+		metrics.ControllerServicesIPVSCommandTime.Observe(ipvsCmdTime.Seconds())
+	}
+	klog.V(2).Infof("IPVS command time took: %v", ipvsCmdTime)
+
+	iptablesCmdStart := time.Now()
 
 	// cleanup iptables masquerade rule
 	err = deleteMasqueradeIptablesRule()
@@ -2116,6 +2197,12 @@ func (nsc *NetworkServicesController) Cleanup() {
 		klog.Errorf("Failed to cleanup iptables hairpin rules: %s", err.Error())
 		return
 	}
+
+	iptablesCmdTime := time.Since(iptablesCmdStart)
+	if nsc.MetricsEnabled {
+		metrics.ControllerServicesIPTablesCommandTime.Observe(iptablesCmdTime.Seconds())
+	}
+	klog.V(2).Infof("IPTables command time took: %v", iptablesCmdTime)
 
 	nsc.cleanupIpvsFirewall()
 
@@ -2272,6 +2359,9 @@ func NewNetworkServicesController(clientset kubernetes.Interface,
 		prometheus.MustRegister(metrics.ServicePpsIn)
 		prometheus.MustRegister(metrics.ServicePpsOut)
 		prometheus.MustRegister(metrics.ServiceTotalConn)
+		prometheus.MustRegister(metrics.ControllerServicesIPSetCommandTime)
+		prometheus.MustRegister(metrics.ControllerServicesIPTablesCommandTime)
+		prometheus.MustRegister(metrics.ControllerServicesIPVSCommandTime)
 		nsc.MetricsEnabled = true
 	}
 
