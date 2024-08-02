@@ -506,6 +506,25 @@ func (nsc *NetworkServicesController) setupIpvsFirewall() error {
 			return fmt.Errorf("failed to run iptables command: %s", err.Error())
 		}
 
+		if family == v1.IPv6Protocol {
+			// Allow IPv6 specific neighbor discovery messages
+			comment = "allow icmp neighbor solicitation messages to service IPs"
+			args = []string{"-m", "comment", "--comment", comment, "-p", icmpProto, icmpType, "neighbor-solicitation",
+				"-j", "ACCEPT"}
+			err = iptablesCmdHandler.AppendUnique("filter", ipvsFirewallChainName, args...)
+			if err != nil {
+				return fmt.Errorf("failed to run iptables command: %s", err.Error())
+			}
+
+			comment = "allow icmp neighbor advertisement messages to service IPs"
+			args = []string{"-m", "comment", "--comment", comment, "-p", icmpProto, icmpType, "neighbor-advertisement",
+				"-j", "ACCEPT"}
+			err = iptablesCmdHandler.AppendUnique("filter", ipvsFirewallChainName, args...)
+			if err != nil {
+				return fmt.Errorf("failed to run iptables command: %s", err.Error())
+			}
+		}
+
 		// destination-unreachable here is also responsible for handling / allowing
 		// PMTU (https://en.wikipedia.org/wiki/Path_MTU_Discovery) responses
 		comment = "allow icmp destination unreachable messages to service IPs"

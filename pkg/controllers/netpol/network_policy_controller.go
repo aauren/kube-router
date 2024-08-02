@@ -581,12 +581,7 @@ func (npc *NetworkPolicyController) ensureExplicitAccept() {
 
 // Creates custom chains KUBE-NWPLCY-DEFAULT
 func (npc *NetworkPolicyController) ensureDefaultNetworkPolicyChain() {
-	for _, iptablesCmdHandler := range npc.iptablesCmdHandlers {
-		markArgs := make([]string, 0)
-		markComment := "rule to mark traffic matching a network policy"
-		markArgs = append(markArgs, "-j", "MARK", "-m", "comment", "--comment", markComment,
-			"--set-xmark", "0x10000/0x10000")
-
+	for family, iptablesCmdHandler := range npc.iptablesCmdHandlers {
 		exists, err := iptablesCmdHandler.ChainExists("filter", kubeDefaultNetpolChain)
 		if err != nil {
 			klog.Fatalf("failed to check for the existence of chain %s, error: %v", kubeDefaultNetpolChain, err)
@@ -598,6 +593,34 @@ func (npc *NetworkPolicyController) ensureDefaultNetworkPolicyChain() {
 					kubeDefaultNetpolChain, err.Error())
 			}
 		}
+
+		if family == v1core.IPv6Protocol {
+			// In the case of IPv6 we also need to allow certain ICMP requests in order to facilitate neighbor discovery
+			// without this, pods that have not already initiated communication before network policy is applied will
+			// not be able to communicate with each other
+			icmp6Proto := "ipv6-icmp"
+			icmp6Type := "--icmpv6-type"
+			icmpComment := "allow icmp neighbor solicitation messages to service IPs"
+			icmpArgs := []string{"-m", "comment", "--comment", icmpComment, "-p", icmp6Proto, icmp6Type,
+				"neighbor-solicitation", "-j", "ACCEPT"}
+			err = iptablesCmdHandler.AppendUnique("filter", kubeDefaultNetpolChain, icmpArgs...)
+			if err != nil {
+				klog.Fatalf("failed to run iptables command: %s", err.Error())
+			}
+
+			icmpComment = "allow icmp neighbor advertisement messages to service IPs"
+			icmpArgs = []string{"-m", "comment", "--comment", icmpComment, "-p", icmp6Proto, icmp6Type,
+				"neighbor-advertisement", "-j", "ACCEPT"}
+			err = iptablesCmdHandler.AppendUnique("filter", kubeDefaultNetpolChain, icmpArgs...)
+			if err != nil {
+				klog.Fatalf("failed to run iptables command: %s", err.Error())
+			}
+		}
+
+		markArgs := make([]string, 0)
+		markComment := "rule to mark traffic matching a network policy"
+		markArgs = append(markArgs, "-j", "MARK", "-m", "comment", "--comment", markComment,
+			"--set-xmark", "0x10000/0x10000")
 		err = iptablesCmdHandler.AppendUnique("filter", kubeDefaultNetpolChain, markArgs...)
 		if err != nil {
 			klog.Fatalf("Failed to run iptables command: %s", err.Error())
